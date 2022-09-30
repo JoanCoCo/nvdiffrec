@@ -389,7 +389,9 @@ def display_image(image, title=None):
     if title is None:
         title = 'Debug window'
     global _glfw_window
+    global _old_window
     if _glfw_window is None:
+        _old_window = glfw.get_current_context()
         glfw.default_window_hints()
         _glfw_window = glfw.create_window(width, height, title, None, None)
         glfw.make_context_current(_glfw_window)
@@ -410,6 +412,7 @@ def display_image(image, title=None):
     gl_dtype = {'uint8': gl.GL_UNSIGNED_BYTE, 'float32': gl.GL_FLOAT}[image.dtype.name]
     gl.glDrawPixels(width, height, gl_format, gl_dtype, image[::-1])
     glfw.swap_buffers(_glfw_window)
+    glfw.make_context_current(_old_window)
     if glfw.window_should_close(_glfw_window):
         return False
     return True
