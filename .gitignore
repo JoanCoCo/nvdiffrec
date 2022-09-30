@@ -1,2 +1,3 @@
-./data/nerf_synthetic/
-./data/nerd/
+data/nerf_synthetic/
+data/nerd/
+out/
