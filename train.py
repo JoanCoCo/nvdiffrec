@@ -21,6 +21,7 @@ import xatlas
 from dataset.dataset_mesh import DatasetMesh
 from dataset.dataset_nerf import DatasetNERF
 from dataset.dataset_llff import DatasetLLFF
+from dataset.dataset_sketch_turnaround import DatasetSketchTurnAround
 
 # Import topology / geometry trainers
 from geometry.dmtet import DMTetGeometry
@@ -569,6 +570,11 @@ if __name__ == "__main__":
         elif os.path.isfile(os.path.join(FLAGS.ref_mesh, 'transforms_train.json')):
             dataset_train    = DatasetNERF(os.path.join(FLAGS.ref_mesh, 'transforms_train.json'), FLAGS, examples=(FLAGS.iter+1)*FLAGS.batch)
             dataset_validate = DatasetNERF(os.path.join(FLAGS.ref_mesh, 'transforms_test.json'), FLAGS)
+        elif os.path.isfile(os.path.join(FLAGS.ref_mesh, 'info.json')):
+            jsonf = json.load(open(os.path.join(FLAGS.ref_mesh, "info.json"), 'r'))
+            if jsonf['type'] == "sketch":
+                dataset_train = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=False)
+                dataset_validate = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=True)
 
     # ==============================================================================================
     #  Create env light with trainable parameters
@@ -577,7 +583,10 @@ if __name__ == "__main__":
     if FLAGS.learn_light:
         lgt = light.create_trainable_env_rnd(512, scale=0.0, bias=0.5)
     else:
-        lgt = light.load_env(FLAGS.envmap, scale=FLAGS.env_scale)
+        if FLAGS.envmap == "white":
+            lgt = light.create_white_env(512, scale=FLAGS.env_scale)
+        else:
+            lgt = light.load_env(FLAGS.envmap, scale=FLAGS.env_scale)
 
     if FLAGS.base_mesh is None:
         # ==============================================================================================

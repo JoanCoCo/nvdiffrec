@@ -155,4 +155,10 @@ def save_env_map(fn, light):
 def create_trainable_env_rnd(base_res, scale=0.5, bias=0.25):
     base = torch.rand(6, base_res, base_res, 3, dtype=torch.float32, device='cuda') * scale + bias
     return EnvironmentLight(base)
+
+def create_white_env(base_res, scale=0.5):
+    base = torch.ones(6, base_res, base_res, 3, dtype=torch.float32, device='cuda') * scale
+    l = EnvironmentLight(base)
+    l.build_mips()
+    return  l
       

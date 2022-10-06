@@ -191,6 +191,14 @@ def perspective(fovy=0.7854, aspect=1.0, n=0.1, f=1000.0, device=None):
                          [           0,    0, -(f+n)/(f-n), -(2*f*n)/(f-n)], 
                          [           0,    0,           -1,              0]], dtype=torch.float32, device=device)
 
+def ortographic(aspect=1.0, n=0.1, f=1000.0, device=None):
+    w = 1.0 if aspect <= 1.0 else aspect
+    h = 1.0 if aspect >= 1.0 else aspect
+    return torch.tensor([[         1/w,    0,            0,              0], 
+                         [           0, -1/h,            0,              0], 
+                         [           0,    0,      -2/(f-n),   -(f+n)/(f-n)], 
+                         [           0,    0,            0,              1]], dtype=torch.float32, device=device)
+
 # Reworked so this matches gluPerspective / glm::perspective, using fovy
 def perspective_offcenter(fovy, fraction, rx, ry, aspect=1.0, n=0.1, f=1000.0, device=None):
     y = np.tan(fovy / 2)
