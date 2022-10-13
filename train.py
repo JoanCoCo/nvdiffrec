@@ -7,6 +7,7 @@
 # without an express license agreement from NVIDIA CORPORATION or 
 # its affiliates is strictly prohibited.
 
+from genericpath import isfile
 import os
 import time
 import argparse
@@ -22,6 +23,7 @@ from dataset.dataset_mesh import DatasetMesh
 from dataset.dataset_nerf import DatasetNERF
 from dataset.dataset_llff import DatasetLLFF
 from dataset.dataset_sketch_turnaround import DatasetSketchTurnAround
+from dataset.dataset_colmap import DatasetColmap
 
 # Import topology / geometry trainers
 from geometry.dmtet import DMTetGeometry
@@ -575,6 +577,9 @@ if __name__ == "__main__":
             if jsonf['type'] == "sketch":
                 dataset_train = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=False)
                 dataset_validate = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=True)
+        elif os.path.isfile(os.path.join(FLAGS.ref_mesh, 'images.txt')):
+            dataset_train = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=False, show_estimation=True)
+            dataset_validate = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=True, show_estimation=False)
 
     # ==============================================================================================
     #  Create env light with trainable parameters

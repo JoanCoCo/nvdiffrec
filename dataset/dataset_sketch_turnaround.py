@@ -24,6 +24,7 @@ class DatasetSketchTurnAround(Dataset):
     def __init__(self, base_path, FLAGS, validation=False):
         self.FLAGS = FLAGS
         self.validation = 0.2
+        self.is_val = validation
         self.base_dir = base_path
 
         # Load config / transforms
@@ -66,7 +67,7 @@ class DatasetSketchTurnAround(Dataset):
         return img[None, ...], mv[None, ...], mvp[None, ...], campos[None, ...] # Add batch dimension
 
     def __len__(self):
-        return (self.FLAGS.iter+1)*self.FLAGS.batch
+        return self.n_images if self.is_val else (self.FLAGS.iter+1)*self.FLAGS.batch
 
     def __getitem__(self, itr):
         iter_res = self.FLAGS.train_res
