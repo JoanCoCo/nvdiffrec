@@ -65,11 +65,12 @@ def generate_scene():
 
     return mv[None, ...].cuda(), mvp[None, ...].cuda(), campos[None, ...].cuda() # Add batch dimension
 
-def load_matrix(source="/home/joancc/Documents/TFM/Video test 2/images.txt"):
+def load_matrix(source="/home/joancc/Documents/TFM/Totoro test/images.txt"):
     description_file = open(source, "r")
     skip_next = False
     view_mtxs = {}
     camera_centers = {}
+    look_ats = {}
     for line in description_file:
         if not '#' in line and not skip_next:
             units = line.split(" ")
@@ -93,15 +94,19 @@ def load_matrix(source="/home/joancc/Documents/TFM/Video test 2/images.txt"):
 
             camera_centers[units[9][:-1]] = torch.tensor(-(np.transpose(rm)) @ tm)
 
+            look_ats[units[9][:-1]] = -torch.tensor(np.transpose(rm) @ np.array([0, 0, 1]).reshape(3, 1))
+
             skip_next = True
         else:
             skip_next = False
     description_file.close()
 
     points = np.zeros((len(camera_centers), 3))
+    directions = np.zeros((len(camera_centers), 3))
     i = 0
     for key in camera_centers:
         points[i] = camera_centers[key].reshape(3)
+        directions[i] = look_ats[key].reshape(3)
         i += 1
 
     """
@@ -127,7 +132,7 @@ def load_matrix(source="/home/joancc/Documents/TFM/Video test 2/images.txt"):
     average_center = np.mean(np.array(average_centers), axis=0)
     average_center[1] = 0.0
     """
-    average_center = sphere_search(points)
+    average_center = sphere_search(points, directions)
     
     for key in view_mtxs:
         rotM = np.eye(4,4)
@@ -147,12 +152,14 @@ def load_matrix(source="/home/joancc/Documents/TFM/Video test 2/images.txt"):
     ax.scatter(points[:, 0] - average_center[0], points[:, 2]  - average_center[2], points[:, 1] - average_center[1], marker='x')
     ax.scatter([average_center[0]], [average_center[2]], [average_center[1]], marker='^')
     ax.scatter([0], [0], [0], marker='+')
+    for i in range(0, points.shape[0]):
+        ax.plot([points[i, 0], points[i, 0] + directions[i, 0]], [points[i, 2], points[i, 2] + directions[i, 2]], [points[i, 1], points[i, 1] + directions[i, 1]])
     ax.set_xlabel("X")
     ax.set_ylabel("Z")
     ax.set_zlabel("Y")
-    ax.set_xlim([-4, 4])
-    ax.set_zlim([-4, 4])
-    ax.set_ylim([-4, 4])
+    ax.set_xlim([-10, 10])
+    ax.set_zlim([-10, 10])
+    ax.set_ylim([-10, 10])
     plt.title("View distribution and mapping")
     plt.show()
 
@@ -201,8 +208,20 @@ def find_sphere(P1, P2, P3, P4):
 
     return (np.array([a, b, c]), r)
 
-def sphere_search(points, iterations=1000, generations=20, max_depth=50, alpha=0.6, exhaustive_search=False):
+def sphere_search(points, directions, iterations=1000, generations=20, max_depth=50, alpha=0.6, exhaustive_search=False):
     np.random.seed(237)
+
+    mods = np.linalg.norm(points, axis=-1)
+    avr_mod = np.mean(mods)
+    outliers = points[mods > 2 * avr_mod]
+    if outliers.shape[0] > 0:
+        print("Outliers found and removed: \n{}".format(outliers))
+    else:
+        print("No outliers have been found.")
+    points = points[mods <= 2 * avr_mod]
+    directions = directions[mods <= 2 * avr_mod]
+    directions = directions / np.tile(np.linalg.norm(directions, axis=-1), (1, directions.shape[1])).reshape(directions.shape)
+
     n_points = points.shape[0]
     dims = points.shape[1]
     gridA = np.reshape(np.tile(points, (1, n_points)), (n_points, n_points, dims))
@@ -212,6 +231,8 @@ def sphere_search(points, iterations=1000, generations=20, max_depth=50, alpha=0
     for i in np.random.randint(0, n_points, 3):
         for j in np.random.randint(0, n_points, 3):
             assert distances[i, j] == np.linalg.norm(points[i] - points[j])
+
+    max_radius = np.inf #2.0 * np.max(distances)
 
     best_sol = np.zeros(dims)
     best_sol_inds = np.zeros(4)
@@ -227,7 +248,7 @@ def sphere_search(points, iterations=1000, generations=20, max_depth=50, alpha=0
                 costs = np.zeros(candidates.shape[0])
                 for i in built_sol:
                     for inx in range(0, candidates.shape[0]):
-                        costs[inx] += 1/distances[i, candidates[inx]]
+                        costs[inx] += 1/distances[i, candidates[inx]] if distances[i, candidates[inx]] > 0 else 1000000
                 sorted_c = np.argsort(costs)
                 candidates = candidates[sorted_c]       
                 costs = costs[sorted_c]
@@ -241,9 +262,14 @@ def sphere_search(points, iterations=1000, generations=20, max_depth=50, alpha=0
             assert built_sol.shape[0] == 4 and np.unique(built_sol).shape[0] == built_sol.shape[0]
 
             center, radius = find_sphere(points[built_sol[0]], points[built_sol[1]], points[built_sol[2]], points[built_sol[3]])
-            dists = np.linalg.norm(points - np.reshape(np.tile(center, (1, n_points)), (n_points, dims)), axis=-1)
-            current_cost = np.sum(np.abs(dists - radius)) #* radius + 0.5 * radius
-            if current_cost < best_cost:
+            mapped_directions = np.reshape(np.tile(center, (1, n_points)), (n_points, dims)) - points
+            dists = np.linalg.norm(mapped_directions, axis=-1)
+            mapped_directions = mapped_directions / np.tile(dists, (1, mapped_directions.shape[1])).reshape(mapped_directions.shape)
+            cosines = np.ones(directions.shape[0]) - np.einsum('ij,ij->i', directions, mapped_directions)
+            ca = np.sum(np.abs(dists - radius))
+            cb = np.sum(np.abs(cosines))
+            current_cost = 0.40 * ca + 1.0 * cb
+            if current_cost < best_cost and radius <= max_radius:
                 best_cost = current_cost
                 best_sol = center
                 best_sol_inds = built_sol
@@ -257,12 +283,17 @@ def sphere_search(points, iterations=1000, generations=20, max_depth=50, alpha=0
             n_costs = np.zeros(neighs.shape[0])
             for i in range(0, neighs.shape[0]):
                 center, radius = find_sphere(points[neighs[i][0]], points[neighs[i][1]], points[neighs[i][2]], points[neighs[i][3]])
-                dists = np.linalg.norm(points - np.reshape(np.tile(center, (1, n_points)), (n_points, dims)), axis=-1)
-                n_costs[i] = np.mean(np.abs(dists - radius)) * radius + radius
+                mapped_directions = np.reshape(np.tile(center, (1, n_points)), (n_points, dims)) - points
+                dists = np.linalg.norm(mapped_directions, axis=-1)
+                mapped_directions = mapped_directions / np.tile(dists, (1, mapped_directions.shape[1])).reshape(mapped_directions.shape)
+                cosines = np.ones(directions.shape[0]) - np.einsum('ij,ij->i', directions, mapped_directions)
+                ca = np.sum(np.abs(dists - radius))
+                cb = np.sum(np.abs(cosines))
+                n_costs[i] = 0.40 * ca + 1.0 * cb
             n_sort = np.argsort(n_costs)
             neighs = neighs[n_sort]
             n_costs = n_costs[n_sort]
-            if n_costs[0] < best_cost:
+            if n_costs[0] < best_cost and radius <= max_radius:
                 best_cost = n_costs[0]
                 best_sol, _ = find_sphere(points[neighs[0][0]], points[neighs[0][1]], points[neighs[0][2]], points[neighs[0][3]])
                 best_sol_inds = neighs[0]
