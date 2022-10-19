@@ -93,7 +93,7 @@ def load_cameras(filename, resolution):
     description_file.close()
     return (view_mtxs, view_points, camera_centers, look_ats)
 
-def apply_bounding_box(bb, points, array_mapping, points_in_views, resolution, top=100, plot=True, save_interval=300):
+def apply_bounding_box(bb, points, array_mapping, points_in_views, resolution, top=100, plot=False, save_interval=300):
     """Filters the points estimated in Colmap by applying a bounding box on the
     2D proyection of the key points in each image.  
 
@@ -106,7 +106,7 @@ def apply_bounding_box(bb, points, array_mapping, points_in_views, resolution, t
         resolution: array containing the height (0) and width (1) of the images
         used for the estimation.
         top: number of most voted points that will form the solution (default 100).
-        plot: do you want to plot the filtering? (Default True).
+        plot: do you want to plot the filtering? (Default Flase).
         save_interval: frequancy in which the filtering is plotted and stored 
         (default 300).
 

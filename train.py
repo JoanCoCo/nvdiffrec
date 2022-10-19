@@ -522,6 +522,9 @@ if __name__ == "__main__":
     FLAGS.nrm_max             = [ 1.0,  1.0,  1.0]
     FLAGS.cam_near_far        = [0.1, 1000.0]
     FLAGS.learn_light         = True
+    FLAGS.use_bb              = False
+    FLAGS.bounding_box        = []
+    FLAGS.colmap_res          = [1080, 1920]
 
     FLAGS.local_rank = 0
     FLAGS.multi_gpu  = "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1
