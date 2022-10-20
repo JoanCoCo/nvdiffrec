@@ -224,6 +224,19 @@ def find_sphere(P1, P2, P3, P4):
 
     return (np.array([a, b, c]), r)
 
+def filter_outliers(points, directions):
+    mods = np.linalg.norm(points, axis=-1)
+    avr_mod = np.mean(mods)
+    outliers = points[mods > 2 * avr_mod]
+    if outliers.shape[0] > 0:
+        print("Colmap utils: Outliers found and removed: \n{}".format(outliers))
+    else:
+        print("Colmap utils: No outliers have been found.")
+    points = points[mods <= 2 * avr_mod]
+    directions = directions[mods <= 2 * avr_mod]
+    return (points, directions)
+
+
 def sphere_search(points, directions, reference_point=None, iterations=1000, generations=20, max_depth=50, alpha=0.6, exhaustive_search=False):
     """Searches the 4 points that best describe the sphere that characterizes a
     set of oriented points.
@@ -247,15 +260,7 @@ def sphere_search(points, directions, reference_point=None, iterations=1000, gen
 
     use_reference_point = not isinstance(reference_point, type(None))
 
-    mods = np.linalg.norm(points, axis=-1)
-    avr_mod = np.mean(mods)
-    outliers = points[mods > 2 * avr_mod]
-    if outliers.shape[0] > 0:
-        print("DatasetColmap: Outliers found and removed: \n{}".format(outliers))
-    else:
-        print("DatasetColmap: No outliers have been found.")
-    points = points[mods <= 2 * avr_mod]
-    directions = directions[mods <= 2 * avr_mod]
+    points, directions = filter_outliers(points, directions)
     directions = directions / np.tile(np.linalg.norm(directions, axis=-1), (1, directions.shape[1])).reshape(directions.shape)
 
     n_points = points.shape[0]
@@ -346,6 +351,7 @@ def evaluate_sphere(center, radius, points, directions):
     return current_cost
 
 def evaluate_sphere_no_radius(center, points, directions):
+    points, directions = filter_outliers(points, directions)
     n_points = points.shape[0]
     dims = points.shape[1]
     mapped_directions = np.reshape(np.tile(center, (1, n_points)), (n_points, dims)) - points
