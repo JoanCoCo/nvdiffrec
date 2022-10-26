@@ -26,7 +26,7 @@ def _load_img(path):
     return img
 
 class DatasetColmap(Dataset):
-    def __init__(self, base_path, FLAGS, validation=False, show_estimation=True):
+    def __init__(self, base_path, FLAGS, validation=False, show_estimation=True, load_estimation=True, save_estimation=True):
         self.FLAGS = FLAGS
         self.is_val = validation
         self.base_dir = base_path
@@ -41,8 +41,15 @@ class DatasetColmap(Dataset):
         self.resolution = _load_img(self.image_files[0]).shape[0:2]
         self.aspect = self.resolution[1] / self.resolution[0]
 
-        assert os.path.exists(os.path.join(parent_base, "images.txt")), "DatasetColmap: images.txt file is missing."
-        assert os.path.exists(os.path.join(parent_base, "points3D.txt")), "DatasetColmap: points3D.txt file is missing."
+        if not (os.path.exists(os.path.join(parent_base, "images.txt")) and os.path.exists(os.path.join(parent_base, "points3D.txt"))):
+            assert os.path.exists(os.path.join(parent_base, "all")), "DatasetColmap: failed to load all images when trying to apply Colmap"
+            database = os.path.join(parent_base, "database.db")
+            images_folder = os.path.join(parent_base, "all")
+            colmap_utils.run_colmap_estimation(database, images_folder, parent_base)
+            assert os.path.exists(os.path.join(parent_base, "images.txt")), "DatasetColmap: images.txt not found after Colmap execution"
+            assert os.path.exists(os.path.join(parent_base, "points3D.txt")), "DatasetColmap: points3D.txt not found after Colmap execution"
+
+
         print("DatasetColmap: loading camera information.")
         self.view_mtxs, view_points, camera_centers, look_ats = colmap_utils.load_cameras(os.path.join(parent_base, "images.txt"), FLAGS.colmap_res)
 
@@ -59,25 +66,37 @@ class DatasetColmap(Dataset):
         found_center = np.zeros(3)
         filtered_samples = []
 
-        if FLAGS.use_bb:
-            print("DatasetColmap: loading point cloud information.")
-            bb = np.array(FLAGS.bounding_box, dtype=np.uint)
-            print("DatasetColmap: Filtering with bounding box ({}, {}) - ({}, {}).".format(bb[0, 0], bb[0, 1], bb[1, 0], bb[1, 1]))
-            cloud_points, array_mapping = colmap_utils.load_points(os.path.join(parent_base, "points3D.txt"))
-            filtered_samples, weights = colmap_utils.apply_bounding_box(bb, cloud_points, array_mapping, view_points, FLAGS.colmap_res)
-            suggested_center = np.average(filtered_samples[:, 0:3], axis=0, weights=weights)
-            found_center = colmap_utils.sphere_search(camera_points, camera_directions)
-            centers = np.array([suggested_center, found_center])
-            scores = np.array([ colmap_utils.evaluate_sphere_no_radius(suggested_center, camera_points, camera_directions), 
-                                colmap_utils.evaluate_sphere_no_radius(found_center, camera_points, camera_directions)])
-            average_center = np.average(centers, axis=0, weights=scores)
+        if load_estimation and os.path.exists(os.path.join(parent_base, "center.npy")):
+            print("DatasetColmap: loading previous center estimation.")
+            average_center = np.load(os.path.join(parent_base, "center.npy"))
         else:
-            average_center = colmap_utils.sphere_search(camera_points, camera_directions)
+            if FLAGS.use_bb:
+                print("DatasetColmap: center estimation method set to \"{}\"".format(FLAGS.center_estimation))
 
-        for key in self.view_mtxs:
-            self.view_mtxs[key] = colmap_utils.relocate_view_matrix(average_center, self.view_mtxs[key])
+            if FLAGS.use_bb and FLAGS.center_estimation != "grasp":
+                print("DatasetColmap: loading point cloud information.")
+                bb = np.array(FLAGS.bounding_box, dtype=np.uint)
+                print("DatasetColmap: Filtering with bounding box ({}, {}) - ({}, {}).".format(bb[0, 0], bb[0, 1], bb[1, 0], bb[1, 1]))
+                cloud_points, array_mapping = colmap_utils.load_points(os.path.join(parent_base, "points3D.txt"))
+                filtered_samples, weights = colmap_utils.apply_bounding_box(bb, cloud_points, array_mapping, view_points, FLAGS.colmap_res)
+                suggested_center = np.average(filtered_samples[:, 0:3], axis=0, weights=weights)
+                if FLAGS.center_estimation == "averaged":
+                    found_center = colmap_utils.sphere_search(camera_points, camera_directions)
+                    centers = np.array([suggested_center, found_center])
+                    scores = np.array([ colmap_utils.evaluate_sphere_no_radius(suggested_center, camera_points, camera_directions), 
+                                    colmap_utils.evaluate_sphere_no_radius(found_center, camera_points, camera_directions)])
+                    average_center = np.average(centers, axis=0, weights=scores)
+                else:
+                    average_center = np.copy(suggested_center)
+            else:
+                average_center = colmap_utils.sphere_search(camera_points, camera_directions)
+
+            for key in self.view_mtxs:
+                self.view_mtxs[key] = colmap_utils.relocate_view_matrix(average_center, self.view_mtxs[key])
         
         print("DatasetColmap: Estimated center is {}".format(average_center))
+        if save_estimation:
+            np.save(os.path.join(parent_base, "center.npy"), average_center)
 
         if show_estimation:
             fig = plt.figure()

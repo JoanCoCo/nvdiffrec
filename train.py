@@ -525,6 +525,7 @@ if __name__ == "__main__":
     FLAGS.use_bb              = False
     FLAGS.bounding_box        = []
     FLAGS.colmap_res          = [1080, 1920]
+    FLAGS.center_estimation   = "averaged"               # averaged, bb or grasp
 
     FLAGS.local_rank = 0
     FLAGS.multi_gpu  = "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1
@@ -581,8 +582,8 @@ if __name__ == "__main__":
                 dataset_train = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=False)
                 dataset_validate = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=True)
         elif os.path.isfile(os.path.join(FLAGS.ref_mesh, 'images.txt')):
-            dataset_train = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=False, show_estimation=True)
-            dataset_validate = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=True, show_estimation=False)
+            dataset_train = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=False, load_estimation=False, show_estimation=True)
+            dataset_validate = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=True, load_estimation=True, show_estimation=False)
 
     # ==============================================================================================
     #  Create env light with trainable parameters
