@@ -581,7 +581,7 @@ if __name__ == "__main__":
             if jsonf['type'] == "sketch":
                 dataset_train = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=False)
                 dataset_validate = DatasetSketchTurnAround(FLAGS.ref_mesh, FLAGS, validation=True)
-        elif os.path.isfile(os.path.join(FLAGS.ref_mesh, 'images.txt')):
+        elif os.path.isfile(os.path.join(FLAGS.ref_mesh, 'images.txt')) or os.path.exists(os.path.join(FLAGS.ref_mesh, 'all')):
             dataset_train = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=False, load_estimation=False, show_estimation=True)
             dataset_validate = DatasetColmap(FLAGS.ref_mesh, FLAGS, validation=True, load_estimation=True, show_estimation=False)
 
