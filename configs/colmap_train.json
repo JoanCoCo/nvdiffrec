@@ -15,5 +15,6 @@
     "learn_light": true,
     "display": [{"latlong" : true}, {"bsdf" : "kd"}, {"bsdf" : "ks"}, {"bsdf" : "normal"}],
     "background" : "white",
-    "out_dir": "colmap_train"
+    "out_dir": "colmap_train",
+    "use_bb": false
 }

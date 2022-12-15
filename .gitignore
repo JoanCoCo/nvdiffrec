@@ -1,3 +1,6 @@
-data/nerf_synthetic/
-data/nerd/
-out/
+data/*
+out/*
+configs/*
+test_interp/*
+test_val/*
+Visual\ Hull/*

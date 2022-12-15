@@ -9,6 +9,7 @@
 
 from genericpath import isfile
 import os
+from pickle import TRUE
 import time
 import argparse
 import json
@@ -498,6 +499,7 @@ if __name__ == "__main__":
     parser.add_argument('-rm', '--ref_mesh', type=str)
     parser.add_argument('-bm', '--base-mesh', type=str, default=None)
     parser.add_argument('--validate', type=bool, default=True)
+    #parser.add_argument('--pre_load', type=bool, default=True)
     
     FLAGS = parser.parse_args()
 

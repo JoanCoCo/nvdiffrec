@@ -1,5 +1,5 @@
 {
-    "ref_mesh": "data/colmap/aloy",
+    "ref_mesh": "data/colmap/aloy_bb_auto_mask",
     "random_textures": true,
     "iter": 5000,
     "save_interval": 100,
@@ -15,8 +15,9 @@
     "learn_light": true,
     "display": [{"latlong" : true}, {"bsdf" : "kd"}, {"bsdf" : "ks"}, {"bsdf" : "normal"}],
     "background" : "white",
-    "out_dir": "colmap_aloy_bb",
+    "out_dir": "auto_masking_test",
     "use_bb": true,
     "bounding_box": [[725, 71], [1195, 1271]],
-    "colmap_res": [1342, 1920]
+    "colmap_res": [1342, 1920],
+    "center_estimation": "averaged"
 }

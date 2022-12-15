@@ -12,6 +12,7 @@ from render import util
 from .dataset import Dataset
 import matplotlib.pyplot as plt
 from hvrl import colmap_utils
+from hvrl import mask_utils
 
 def _load_img(path):
     assert os.path.exists(path), "DatasetColmap: Tried to find image file for: %s, but found 0 files" % (path)
@@ -32,7 +33,14 @@ class DatasetColmap(Dataset):
         self.base_dir = base_path
 
         parent_base = self.base_dir
-        self.base_dir = os.path.join(self.base_dir, "test" if self.is_val else "train")
+        self.base_dir = os.path.join(self.base_dir, "test_masked" if self.is_val else "train_masked")
+        if not os.path.exists(self.base_dir):
+            src_dir = os.path.join(parent_base, "test" if self.is_val else "train")
+            assert os.path.exists(src_dir), "DatasetColmap: images folder was not found"
+            bb = np.array(FLAGS.bounding_box, dtype=np.uint) / 2 if FLAGS.use_bb else None
+            print("DatasetColmap: generating automaic masks for the images")
+            mask_utils.automatic_masking(src_dir, self.base_dir, bounding_box=bb.astype(np.uint))
+
         self.image_files = [f for f in sorted(glob.glob(os.path.join(self.base_dir, "*"))) if f.lower().endswith('png') or f.lower().endswith('jpg') or f.lower().endswith('jepg')]
         self.n_images = len(self.image_files)
         assert self.n_images > 0, "DatasetColmap: The dataset is empty"

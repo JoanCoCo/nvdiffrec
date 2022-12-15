@@ -8,11 +8,15 @@ import numpy as np
 from render import util
 
 from .dataset import Dataset
+from PIL import Image
 
-def _load_img(path):
+def _load_img(path, angle=0.0):
     files = glob.glob(path)
     assert len(files) > 0, "Tried to find image file for: %s, but found 0 files" % (path)
-    img = util.load_image_raw(files[0])
+    #img = util.load_image_raw(files[0])
+    img = Image.open(files[0])
+    img = img.convert('RGBA').rotate(angle)
+    img = np.array(img)
     if img.dtype != np.float32: # LDR image
         img = torch.tensor(img / 255, dtype=torch.float32)
         img[..., 0:3] = util.srgb_to_rgb(img[..., 0:3])
@@ -31,17 +35,18 @@ class DatasetSketchTurnAround(Dataset):
         self.cfg = json.load(open(os.path.join(base_path, "info.json"), 'r'))
         self.n_images = self.cfg['size']
         self.angle_frags = self.n_images
-        self.name = self.cfg['name'] + ("_v" if validation else "_t")
-        self.indices = []
+        self.name = self.cfg['name']
+        self.filenames = [f for f in glob.glob(os.path.join(self.base_dir, "*")) if f.lower().endswith('png')]
+        self.filenames = sorted(self.filenames, key=lambda x: float(x.split('/')[-1].split('_')[-1][:-4]) + (0.99 if len(x.split('/')[-1].split('_')[-1][:-4].split('.')) == 1 else 0.0))
 
-        for idx in range(0, self.n_images):
-            if os.path.exists(os.path.join(self.base_dir, self.name + "_{}.png".format(idx))):
-                self.indices.append(idx)
-        self.n_images = len(self.indices)
-        assert self.n_images > 0, "The dataset is empty"
+        #for f in self.filenames: print(f)
+        #exit()
+
+        self.n_images = len(self.filenames)
+        assert len(self.filenames) > 0, "DatasetSketchTurnaround: the dataset is empty"
 
         # Determine resolution & aspect ratio
-        self.resolution = _load_img(os.path.join(self.base_dir, self.name + "_{}.png".format(self.indices[0]))).shape[0:2]
+        self.resolution = _load_img(self.filenames[0]).shape[0:2]
         self.aspect = self.resolution[1] / self.resolution[0]
 
         if self.FLAGS.local_rank == 0:
@@ -59,8 +64,16 @@ class DatasetSketchTurnAround(Dataset):
         #proj = util.perspective(fovy, self.aspect, self.FLAGS.cam_near_far[0], self.FLAGS.cam_near_far[1])
         proj = util.ortographic(self.aspect, n=self.FLAGS.cam_near_far[0], f=self.FLAGS.cam_near_far[1])
         # Load image data and modelview matrix
-        img = _load_img(os.path.join(self.base_dir, self.name + "_{}.png".format(self.indices[idx])))
-        mv = util.translate(0, 0, -2.0) @ util.rotate_y((-2 * np.pi / self.angle_frags) * self.indices[idx])
+        #angle = np.random.rand() * (2.0 * np.pi)
+        #img = _load_img(self.filenames[idx], angle=angle * (-180.0 / np.pi))
+        img = _load_img(self.filenames[idx])
+        #mv = util.random_rotation()
+        #lookat = -np.transpose(mv[0:3, 0:3]) @ np.array([0, 0, 1]).reshape(3, 1)
+        #lookat = np.reshape(lookat, 3)
+        #lookat = 2.0 * (lookat / np.linalg.norm(lookat))
+        #mv = mv @ util.translate(lookat[0], lookat[1], lookat[2]) #@ util.rotate_y((-2 * np.pi / self.angle_frags) * idx)
+        mv = util.translate(0, 0, -2.0) @ util.rotate_y((-2 * np.pi / self.angle_frags) * idx)
+        #mv = util.rotate_y(-np.pi/2) @ util.rotate_x(angle) @ util.rotate_y(np.pi/2) @ util.translate(0, 0, -2.0) @ util.rotate_y((-2 * np.pi / self.angle_frags) * idx)
         campos = torch.linalg.inv(mv)[:3, 3]
         mvp    = proj @ mv
 
